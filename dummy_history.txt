@@ -31,3 +31,4 @@ Log updated on: 2026-06-22 10:14:00 -> add try-except fallback to standard llm i
 Log updated on: 2026-06-23 14:55:00 -> clean up raw search text to save tokens before feeding llm
 Log updated on: 2026-06-24 11:41:00 -> append source urls to final response for citations
 Log updated on: 2026-06-25 16:20:00 -> update walkthrough md with search performance and latency stats
+Log updated on: 2026-06-05 11:24:00 -> setup routing params in state schemas
