@@ -36,3 +36,4 @@ Log updated on: 2026-06-08 14:15:00 -> add classifier prompts to filter search i
 Log updated on: 2026-06-09 10:42:00 -> add duckduckgo-search to requirements and setup client
 Log updated on: 2026-06-10 16:31:00 -> add basic web search fetch logic to data_retrieval
 Log updated on: 2026-06-11 09:12:00 -> add regex utils to scrub emails and internal IDs from queries
+Log updated on: 2026-06-12 15:19:00 -> hook up pii scrubber to run before triggering web search
