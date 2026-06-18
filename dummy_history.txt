@@ -39,3 +39,4 @@ Log updated on: 2026-06-11 09:12:00 -> add regex utils to scrub emails and inter
 Log updated on: 2026-06-12 15:19:00 -> hook up pii scrubber to run before triggering web search
 Log updated on: 2026-06-15 11:05:00 -> register search nodes in graph flow and format response
 Log updated on: 2026-06-16 17:48:00 -> fix circular import loop in delete_doc using local import
+Log updated on: 2026-06-18 13:22:00 -> test state transitions locally with sample web queries
