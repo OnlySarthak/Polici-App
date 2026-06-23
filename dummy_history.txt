@@ -28,3 +28,4 @@ Log updated on: 2026-06-16 17:48:00 -> fix circular import loop in delete_doc us
 Log updated on: 2026-06-18 13:22:00 -> test state transitions locally with sample web queries
 Log updated on: 2026-06-19 16:02:00 -> add initial walkthrough md with local execution logs
 Log updated on: 2026-06-22 10:14:00 -> add try-except fallback to standard llm if search times out
+Log updated on: 2026-06-23 14:55:00 -> clean up raw search text to save tokens before feeding llm
