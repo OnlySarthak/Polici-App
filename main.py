@@ -4,11 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers.chatbot import router as chatbot_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.admin import router as admin_router
+from app.database.init_db import init_database
 
 def create_app() -> FastAPI:
     """
     Factory function to initialize and configure the FastAPI application.
     """
+    # Sync database schema (create tables / add missing columns)
+    init_database()
+
     app = FastAPI(
         title="Insurance Intelligence Engine",
         description="Production-grade asynchronous FastAPI architecture for Insurance Intelligence Engine.",

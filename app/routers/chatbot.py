@@ -16,12 +16,14 @@ async def get_chat(
         session_id: str,
         user_id: Optional[int] = Cookie(None), 
         insurance_id: Optional[str] = Cookie(None), 
-        application_id: Optional[str] = Cookie(None)
+        application_id: Optional[str] = Cookie(None),
+        vehicle_id: Optional[str] = Cookie(None)
     ):
     userSqlDataId = SqlDataRetrivalIds(
         userId=user_id,
         insuranceId=insurance_id,
-        applicationId=application_id
+        applicationId=application_id,
+        vehicleId=vehicle_id
     )
     
     # Create the config payload containing the thread ID (for LangGraph Checkpointer)
@@ -39,7 +41,10 @@ async def get_chat(
     }
     
     result = await graph_runner(state, userSqlDataId, config)
-    return {"response": result}
+    assistant_response = ""
+    if result and result.get("chat_history"):
+        assistant_response = result["chat_history"][-1].get("assistant", "")
+    return {"response": assistant_response}
 
 @router.get("/refresh")
 async def clear_chat():

@@ -4,15 +4,18 @@ from typing import Optional
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 
 from app.schemas.state import RoutingState, IntentRoutingPayload
-from app.utils.constants import INTENSION_PROMPT, FINAL_LLM_PROMPT
+from app.utils.constant import INTENSION_PROMPT, FINAL_LLM_PROMPT
 from app.services.data_retrieval import (
     AsyncSessionLocal, 
     get_vector_data, 
     fetch_user_profile, 
     fetch_application_details, 
     fetch_insurance_details,
+    fetch_vehicle_details,
     get_web_data
 )
 
@@ -37,26 +40,39 @@ def extract_id(query_str: Optional[str]) -> Optional[str]:
 # ==========================================
 # THE GRAPH NODE WORKERS (LangChain Orchestration)
 # ==========================================
+# Change to 'async def' so you can use 'await' inside the function
 async def intent_router_node(state: RoutingState) -> dict:
-    print("🧠 --- Node Processing: Running Database Directives Prompt ---")
+    print("🧠 --- Node Processing: Running Gemini Database Directives Prompt ---")
     
-    user_input = state["last_user_input"]
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    user_input = state["last_user_input"] 
     
-    # Expand the system prompt with exact architecture constraints
+    # Initialize the fast Gemini model
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", 
+        temperature=0.0
+    )
+    
+    # System prompt layout
     system_prompt_layout = ChatPromptTemplate.from_messages([
         ("system", INTENSION_PROMPT),
-        ("user", "{user_input}")        #here we are just telling the llm to classify the user input, not passing actual values
+        ("user", "{user_input}")
     ])
-    # convert the llm response into pydantic model
-    structured_llm = llm.with_structured_output(IntentRoutingPayload)
+    
+    # Enforce native structured schema execution using method="json_schema"
+    structured_llm = llm.with_structured_output(
+        IntentRoutingPayload,
+        method="json_schema"
+    )
 
-                #  user prompt , sys instruction | output structure
+    # Combine pipeline
     intelligent_pipeline = system_prompt_layout | structured_llm
     
+    # Invoke asynchronously
     pydantic_response: IntentRoutingPayload = await intelligent_pipeline.ainvoke({
         "user_input": user_input 
     }) 
+
+    print("intension llm response : " , pydantic_response.model_dump())
     
     return {"routing_payload": pydantic_response.model_dump()}
 
@@ -80,11 +96,13 @@ async def data_retrival_node(state: RoutingState) -> dict:
         user_query = intent_output.sql_user_query
         application_query = intent_output.sql_application_query
         insurance_query = intent_output.sql_insurance_query
+        vehicle_query = intent_output.sql_vehicle_query
  
         # Get explicit IDs passed in state
         user_sql_ids = state.get("user_sql_ids") or {}
 
         async with AsyncSessionLocal() as session:
+
             if user_query:
                 user_id = user_sql_ids.get("userId")
                 if user_id is None:
@@ -112,21 +130,50 @@ async def data_retrival_node(state: RoutingState) -> dict:
                 if application_id:
                     application_output = await fetch_application_details(session, application_id)
                     sql_output.append(application_output)
+            if vehicle_query:
+                vehicle_id = user_sql_ids.get("vehicleId")
+                if not vehicle_id:
+                    extracted = extract_id(vehicle_query)
+                    if extracted:
+                        vehicle_id = extracted
+                if vehicle_id:
+                    vehicle_output = await fetch_vehicle_details(session, vehicle_id, vehicle_query)
+                    sql_output.append(vehicle_output)
 
     # Web search retrieval
     if intent_output.requires_web_search:
         web_output = get_web_data(intent_output.web_search_query)
 
-    return {"vector_output": vector_output, "sql_output": sql_output, "web_output": web_output}
+    return {
+        "vector_output": vector_output, 
+        "sql_output": sql_output, 
+        "web_output": web_output,
+    }
 
 async def llm_response_node(state: RoutingState) -> dict:
     print("🧠 --- Node Processing: Running LLM Synthesis Response ---")
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    llm = ChatOpenAI(
+        model="openrouter/free",
+        openai_api_base="https://openrouter.ai/api/v1",
+        temperature=0.0
+    )
     user_input = state["last_user_input"]
     
     # Formatting context data from SQL, vector db, and web search outputs
-    context_data = f"SQL DB Output:\n{state.get('sql_output')}\n\nVector DB Output:\n{state.get('vector_output')}\n\nWeb Search Output:\n{state.get('web_output')}"
+    context_data = (
+        f"SQL DB Output:\n{state.get('sql_output')}\n\n"
+        f"Vector DB Output:\n{state.get('vector_output')}\n\n"
+        f"Web Search Output:\n{state.get('web_output')}\n\n"
+    )
+
+    # Format chat history into a readable conversation log
+    chat_history_list = state.get("chat_history") or []
+    chat_history_str = ""
+    for turn in chat_history_list:
+        user_msg = turn.get("user", "")
+        assistant_msg = turn.get("assistant", "")
+        chat_history_str += f"User: {user_msg}\nAssistant: {assistant_msg}\n\n"
     
     # Concrete system prompt explaining multi-database structural targets
     system_prompt_layout = ChatPromptTemplate.from_messages([
@@ -139,7 +186,8 @@ async def llm_response_node(state: RoutingState) -> dict:
     # Invoke using your explicit dictionary keys formatted into the prompt
     pydantic_response: str = await intelligent_pipeline.ainvoke({
         "context_data": context_data,
-        "user_query": user_input
+        "user_query": user_input,
+        "chat_history": chat_history_str
     })
 
     chat_history = list(state.get("chat_history") or [])

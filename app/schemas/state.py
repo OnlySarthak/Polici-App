@@ -10,7 +10,7 @@ class RoutingState(TypedDict):
     web_output : object | None
     chat_history : List[object] 
     last_user_input : str
-    routing_payload: Optional[dict]
+    routing_payload: Optional[dict]     
     user_sql_ids: Optional[dict]
     
 # =====================================================================
@@ -26,9 +26,11 @@ class IntentRoutingPayload(BaseModel):
     sql_user_query: Optional[str] = Field(default=None, description="Optimized Postgres SQL filtering parameters for the user table.")
     sql_insurance_query: Optional[str] = Field(default=None, description="Optimized Postgres SQL filtering parameters for the insurance table.")
     sql_application_query: Optional[str] = Field(default=None, description="Optimized Postgres SQL filtering parameters for the applications table.")
+    sql_vehicle_query: Optional[str] = Field(default=None, description="Optimized Postgres SQL filtering parameters for the vehicles table.")
     web_search_query: Optional[str] = Field(default=None, description="Refined search query text for DuckDuckGo web search. Ensure no customer name, email, internal IDs, or company secrets are present here.")
 
 class SqlDataRetrivalIds(BaseModel):
-    userId : Optional[int]
-    insuranceId : Optional[str]
-    applicationId : Optional[str]
+    userId : Optional[int] = None
+    insuranceId : Optional[str] = None
+    applicationId : Optional[str] = None
+    vehicleId : Optional[str] = None

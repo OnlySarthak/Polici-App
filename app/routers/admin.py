@@ -53,9 +53,10 @@ def delete_document(filename: str):
 def list_docs():
     try:
         result = list_files()
+        filenames = [doc.document_name for doc in result]
         return {
             "status": "success",
-            "message": result
+            "message": filenames
         }
     except Exception as e:
         return {
@@ -66,44 +67,23 @@ def list_docs():
 @router.get("/document/{filename}")
 def get_document(filename: str):
     try:
-        from app.knowledge_base.kb import DOCSTORE_DIR, verify_storage_locations
-        from llama_index.core import StorageContext
-        from llama_index.core.schema import NodeRelationship
+        from app.database.config import SessionLocal
+        from app.models.insurance import PolicyDocument
         
-        store_obj = verify_storage_locations()
-        storage_context = StorageContext.from_defaults(
-            vector_store=store_obj["vector_store"],
-            persist_dir=DOCSTORE_DIR
-        )
-        
-        docstore = storage_context.docstore
-        matching_text = []
-        
-        # Search the docstore for nodes originating from this filename
-        for node_id, node in docstore.docs.items():
-            if node.metadata.get("source") == filename:
-                # To avoid duplicating text, we only extract the top-level parent chunks 
-                # (nodes that don't have a PARENT relationship)
-                parent_rel = node.relationships.get(NodeRelationship.PARENT)
-                if not parent_rel:
-                    matching_text.append(node.get_content())
-                    
-        # Fallback: if we didn't find any root parents, just append whatever chunks we have
-        if not matching_text:
-            for node_id, node in docstore.docs.items():
-                if node.metadata.get("source") == filename:
-                    matching_text.append(node.get_content())
-                    
-        if not matching_text:
-            return {"status": "error", "message": "Document not found in the LlamaIndex docstore."}
-            
-        # Reconstruct the document by joining the chunks
-        full_text = "\n\n".join(matching_text)
-        
-        return {
-            "status": "success",
-            "message": full_text
-        }
+        db_session = SessionLocal()()
+        try:
+            doc = db_session.query(PolicyDocument).filter_by(document_name=filename).first()
+            if not doc:
+                return {
+                    "status": "error",
+                    "message": "Document not found in the registry."
+                }
+            return {
+                "status": "success",
+                "message": doc.document_text or "[Document contains no text content]"
+            }
+        finally:
+            db_session.close()
     except Exception as e:
         return {
             "status": "error",

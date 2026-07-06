@@ -69,12 +69,12 @@ async def fetch_application_details(session: AsyncSession, application_id: str):
         return {"error": str(e)}
     
 async def fetch_insurance_details(session:AsyncSession,policy_id: str):
-    """Fetches the insurance details directly from the insurance table."""
+    """Fetches the insurance details directly from the insurances table."""
     try:
         result = await session.execute(
             text("""
                 SELECT *
-                FROM insurance
+                FROM insurances
                 WHERE policy_id = :policy_id
             """),
             {"policy_id": policy_id}
@@ -83,6 +83,31 @@ async def fetch_insurance_details(session:AsyncSession,policy_id: str):
         return dict(insurance._mapping) if insurance else None
     except Exception as e:
         print(f"Error fetching insurance details: {e}")
+        return {"error": str(e)}
+
+async def fetch_vehicle_details(session: AsyncSession, vehicle_ref: str, vehicle_query: Optional[str] = None):
+    """Fetches the vehicle details directly from the vehicles table using registration number or ID."""
+    try:
+        if vehicle_query:
+            result = await session.execute(
+                text(vehicle_query),
+                {"vehicle_ref": vehicle_ref}
+            )
+            vehicle = result.fetchone()
+            return dict(vehicle._mapping) if vehicle else None
+            
+        if vehicle_ref.isdigit():
+            query_text = "SELECT * FROM vehicles WHERE id = :vehicle_id"
+            params = {"vehicle_id": int(vehicle_ref)}
+        else:
+            query_text = "SELECT * FROM vehicles WHERE registration_number = :registration_number"
+            params = {"registration_number": vehicle_ref}
+            
+        result = await session.execute(text(query_text), params)
+        vehicle = result.fetchone()
+        return dict(vehicle._mapping) if vehicle else None
+    except Exception as e:
+        print(f"Error fetching vehicle details: {e}")
         return {"error": str(e)}
 
 def get_vector_data(query):

@@ -59,7 +59,7 @@ def initia_ingestion_run(raw_text_from_frontend: str, filename: str):
     print("--- Execution Mode: Writing Data ---")
 
     #add file name to db
-    add_file_name(filename)
+    add_file_name(filename, raw_text_from_frontend)
     
     # 1. Create a mock single document representing raw policy source
     raw_doc = Document(text=raw_text_from_frontend, metadata={"source": filename})

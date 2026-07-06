@@ -17,9 +17,7 @@ class ApplicationStatus(str, Enum):
     APPROVED = "APPROVED"
     DENIED = "DENIED"
 
-# =====================================================================
 # USER MODEL
-# =====================================================================
 class UserModel(Base):
     __tablename__ = "users"
 
@@ -27,14 +25,39 @@ class UserModel(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
 
     # Relationships
     policies: Mapped[list["InsuranceModel"]] = relationship(back_populates="owner")
     applications: Mapped[list["ApplicationModel"]] = relationship(back_populates="applicant")
+    vehicles: Mapped[list["VehicleModel"]] = relationship(back_populates="owner")
+
+# VEHICLE ASSET MODEL (New Normalized Table)
+class VehicleModel(Base):
+    __tablename__ = "vehicles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    registration_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    vehicle_type: Mapped[str] = mapped_column(String(20), nullable=False) # e.g., "2-wheeler", "4-wheeler"
+    make: Mapped[str] = mapped_column(String(50), nullable=False)          # e.g., "Yamaha"
+    model: Mapped[str] = mapped_column(String(50), nullable=False)         # e.g., "R15 V4"
+    year: Mapped[int] = mapped_column(Integer, nullable=False)             # e.g., 2024
+    
+    # Missing parameters needed for robust underwriting
+    chassis_number: Mapped[str] = mapped_column(String(100), unique=True, nullable=True)
+    engine_number: Mapped[str] = mapped_column(String(100), unique=True, nullable=True)
+    fuel_type: Mapped[str] = mapped_column(String(20), default="PETROL")   # PETROL, DIESEL, EV
+    insured_declared_value: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True) 
+
+    # Link back to the user who owns the vehicle
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Relationships
+    owner: Mapped["UserModel"] = relationship(back_populates="vehicles")
+    policies: Mapped[list["InsuranceModel"]] = relationship(back_populates="vehicle")
 
 # =====================================================================
 # INSURANCE POLICY MODEL (Static Product Definition)
-# =====================================================================
 class InsuranceModel(Base):
     __tablename__ = "insurances"
 
@@ -43,13 +66,14 @@ class InsuranceModel(Base):
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     coverage_details: Mapped[str] = mapped_column(Text, nullable=False) # Maps to heavy document string
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    vehicle_id: Mapped[int] = mapped_column(Integer, ForeignKey("vehicles.id"), nullable=True)
+
     # Relationships
     owner: Mapped["UserModel"] = relationship(back_populates="policies")
+    vehicle: Mapped["VehicleModel"] = relationship(back_populates="policies")
     applications: Mapped[list["ApplicationModel"]] = relationship(back_populates="insurance")
 
-# =====================================================================
 # APPLICATION MODEL (Dynamic Operational State)
-# =====================================================================
 class ApplicationModel(Base):
     __tablename__ = "applications"
 
@@ -73,6 +97,7 @@ class ApplicationModel(Base):
     applicant: Mapped["UserModel"] = relationship(back_populates="applications")
     insurance: Mapped["InsuranceModel"] = relationship(back_populates="applications")
 
+#model for inlist the policy documents fed by Admin
 class PolicyDocument(Base):
     __tablename__ = "policy_documents"
     
@@ -83,5 +108,8 @@ class PolicyDocument(Base):
     # Unique=True ensures you never ingest the same filename twice by mistake!
     document_name = Column(String, unique=True, nullable=False, index=True)
     
-    # 3. Optional but highly recommended metadata for tracking updates
+    # 3. Raw text content of the document for previews
+    document_text = Column(Text, nullable=True)
+    
+    # 4. Optional but highly recommended metadata for tracking updates
     uploaded_at = Column(DateTime, server_default=func.now())

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database.config import SessionLocal
-from app.models.insurance import UserModel, ApplicationModel, InsuranceModel
+from app.models.insurance import UserModel, ApplicationModel, InsuranceModel, VehicleModel
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
@@ -34,11 +34,16 @@ def login(response: Response, username: str = Body(..., embed=True), db: Session
     if insurance:
         response.set_cookie(key="insurance_id", value=insurance.policy_id)
     
+    vehicle = db.query(VehicleModel).filter(VehicleModel.user_id == user.id).first()
+    if vehicle:
+        response.set_cookie(key="vehicle_id", value=vehicle.registration_number)
+    
     return {
         "message": "Login successful",
         "user_id": user.id,
         "application_id": application.application_id if application else None,
-        "insurance_id": insurance.policy_id if insurance else None
+        "insurance_id": insurance.policy_id if insurance else None,
+        "vehicle_id": vehicle.registration_number if vehicle else None
     }
 
 @router.get("/logout")
@@ -46,6 +51,7 @@ async def logout(response: Response):
     response.delete_cookie(key="user_id")
     response.delete_cookie(key="application_id")
     response.delete_cookie(key="insurance_id")
+    response.delete_cookie(key="vehicle_id")
     return {
         "message": "Logout successful"
     }
@@ -55,7 +61,8 @@ async def logout(response: Response):
 def get_dashboard(
     user_id: Optional[int] = Cookie(None), 
     application_id: Optional[str] = Cookie(None), 
-    insurance_id: Optional[str] = Cookie(None), 
+    insurance_id: Optional[str] = Cookie(None),
+    vehicle_id: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
     if not user_id:
@@ -78,7 +85,20 @@ def get_dashboard(
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
-            "created_at": user.created_at
+            "created_at": user.created_at,
+            "vehicles": [
+                {
+                    "registration_number": v.registration_number,
+                    "vehicle_type": v.vehicle_type,
+                    "make": v.make,
+                    "model": v.model,
+                    "year": v.year,
+                    "chassis_number": v.chassis_number,
+                    "engine_number": v.engine_number,
+                    "fuel_type": v.fuel_type,
+                    "insured_declared_value": float(v.insured_declared_value) if v.insured_declared_value is not None else None
+                } for v in user.vehicles
+            ]
         },
         "application": {
             "application_id": application.application_id,
@@ -89,7 +109,18 @@ def get_dashboard(
         "insurance": {
             "policy_id": insurance.policy_id,
             "title": insurance.title,
-            "coverage_details": insurance.coverage_details
+            "coverage_details": insurance.coverage_details,
+            "vehicle": {
+                "registration_number": insurance.vehicle.registration_number,
+                "vehicle_type": insurance.vehicle.vehicle_type,
+                "make": insurance.vehicle.make,
+                "model": insurance.vehicle.model,
+                "year": insurance.vehicle.year,
+                "chassis_number": insurance.vehicle.chassis_number,
+                "engine_number": insurance.vehicle.engine_number,
+                "fuel_type": insurance.vehicle.fuel_type,
+                "insured_declared_value": float(insurance.vehicle.insured_declared_value) if insurance.vehicle.insured_declared_value is not None else None
+            } if insurance.vehicle else None
         } if insurance else None
     }
 
